@@ -4,7 +4,10 @@ import { useVuelidate } from '@vuelidate/core';
 import { required } from '@vuelidate/validators';
 import { computed, ref } from 'vue';
 import Chart from '../components/ChartComponent.vue';
-const current = ref<number>(1);
+import FirstStep from '../components/steps/firstStep.vue';
+import { useAppStore } from '../store/app';
+const store = useAppStore()
+
 interface Model {
   KP: number;
   X: number;
@@ -29,16 +32,9 @@ const model = ref({
 
 })
 const chart_data = ref<Model[]>([])
-const rules = computed(() => {
-  return {
-    project_name: { required },
-    project_desc: { required },
-    client: { required },
-    contractor: { required },
-  };
-});
 
-const second_step_rules = computed(() => {
+
+const rules = computed(() => {
   return {
     maxX: { required },
     minX: { required },
@@ -48,29 +44,18 @@ const second_step_rules = computed(() => {
     minZ: { required }
   }
 })
-const v$ = useVuelidate(rules, model.value.first_step);
-const v$_second_step = useVuelidate(second_step_rules,model.value.second_step);
-async function nextStep() {
-  const result = await v$.value.$validate();
-  if (!result) {
-    return;
-  }
-  current.value++;
-}
+
+const v$ = useVuelidate(rules, model.value.second_step);
+
 
 
 async function handlSave() {
-  const result = await v$_second_step.value.$validate();
+  const result = await v$.value.$validate();
   if (!result) {
     return;
   }
   alert("ok")
 }
-
-
-
-
-
 
 function handleFileChange(event: Event): void {
   const file = (event.target as HTMLInputElement).files?.[0];
@@ -132,66 +117,33 @@ function findMinMax(data: Model[]): { maxX: number, minX: number, maxY: number, 
 
   return { maxX, minX, maxY, minY, maxZ, minZ };
 }
+
+
+function isNumber(evt: any) {
+  evt = evt ? evt : window.event;
+  const charCode = evt.which ? evt.which : evt.keyCode;
+  if (
+    (charCode > 31 && (charCode < 48 || charCode > 57)) && // not a number
+    charCode !== 46 && // not a decimal point
+    charCode !== 45 // not a minus symbol
+  ) {
+    evt.preventDefault();
+  } else {
+    return true;
+  }
+}
+
 </script>
 <template>
-  <form class="p-4">
+  <form class="p-4" @submit.prevent="handlSave">
     <div class="row">
       <div class="col-lg-12">
         <v-timeline direction="horizontal">
-          <v-timeline-item v-for="i in   2  " :dot-color="[i == current ? 'info' : '']" />
+          <v-timeline-item v-for="i in   2  " :dot-color="[i == store.current_step ? 'info' : '']" />
         </v-timeline>
       </div>
     </div>
-    <div v-if="current == 1" class="card m-4">
-      <div class="card-header bg-primary">
-        <div class="card-title">
-          <h5>Step-1 </h5>
-        </div>
-      </div>
-      <div class="card-body">
-
-        <div class="row">
-          <div class="col-lg-3">
-            <div class="form-group" :class="[v$.project_name.$error ? 'error' : '']">
-              <label for="">Project Name</label>
-              <input type="text" v-model="model.first_step.project_name"
-                :class="[v$.project_name.$error ? 'is-invalid' : '']" placeholder="Project Name" class="form-control">
-            </div>
-          </div>
-
-          <div class="col-lg-3">
-            <div class="form-group" :class="[v$.project_desc.$error ? 'error' : '']">
-              <label for="">Project Description</label>
-              <input type="text" v-model="model.first_step.project_desc"
-                :class="[v$.project_desc.$error ? 'is-invalid' : '']" placeholder="Project Description"
-                class="form-control">
-            </div>
-          </div>
-
-          <div class="col-lg-3">
-            <div class="form-group" :class="[v$.client.$error ? 'error' : '']">
-              <label for="">Client</label>
-              <input type="text" v-model="model.first_step.client" :class="[v$.client.$error ? 'is-invalid' : '']"
-                placeholder="Client" class="form-control">
-            </div>
-          </div>
-
-          <div class="col-lg-3">
-            <div class="form-group" :class="[v$.contractor.$error ? 'error' : '']">
-              <label for="">Contractor</label>
-              <input type="text" placeholder="Contractor" :class="[v$.contractor.$error ? 'is-invalid' : '']"
-                v-model="model.first_step.contractor" class="form-control">
-            </div>
-          </div>
-
-
-        </div>
-        <button class="btn btn-sm btn-info float-right mt-3" @click="nextStep()">next</button>
-
-
-      </div>
-    </div>
-
+    <FirstStep v-if="store.current_step == 1" :first_step="model.first_step" v-model="model.first_step" />
     <div v-else>
       <div class="card m-4">
         <div class="card-header bg-primary">
@@ -252,51 +204,58 @@ function findMinMax(data: Model[]): { maxX: number, minX: number, maxY: number, 
 
               <div class="row mt-5">
                 <div class="col-lg-6">
-                  <div class="form-group">
+                  <div class="form-group" :class="[v$.maxX.$error ? 'error' : '']">
                     <label for="">max_X</label>
-                    <input v-model="model.second_step.maxX" type="text" class="form-control">
+                    <input v-model="model.second_step.maxX" placeholder="max_X" @keypress="isNumber"
+                      :class="[v$.maxX.$error ? 'is-invalid' : '']" type="text" class="form-control">
                   </div>
                 </div>
 
                 <div class="col-lg-6">
-                  <div class="form-group">
+                  <div class="form-group" :class="[v$.minX.$error ? 'error' : '']">
                     <label for="">min_X</label>
-                    <input type="text" v-model="model.second_step.minX" class="form-control">
+                    <input type="text" @keypress="isNumber" placeholder="min_X"
+                      :class="[v$.minX.$error ? 'is-invalid' : '']" v-model="model.second_step.minX" class="form-control">
                   </div>
                 </div>
 
                 <div class="col-lg-6">
-                  <div class="form-group">
+                  <div class="form-group" :class="[v$.maxY.$error ? 'error' : '']">
                     <label for="">max_Y</label>
-                    <input type="text" v-model="model.second_step.maxY" class="form-control">
+                    <input type="text" @keypress="isNumber" placeholder="max_Y"
+                      :class="[v$.maxY.$error ? 'is-invalid' : '']" v-model="model.second_step.maxY" class="form-control">
                   </div>
                 </div>
 
                 <div class="col-lg-6">
-                  <div class="form-group">
+                  <div class="form-group" :class="[v$.minY.$error ? 'error' : '']">
                     <label for="">min_Y</label>
-                    <input type="text" v-model="model.second_step.minY" class="form-control">
+                    <input type="text" @keypress="isNumber" placeholder="min_Y"
+                      :class="[v$.minY.$error ? 'is-invalid' : '']" v-model="model.second_step.minY" class="form-control">
                   </div>
                 </div>
 
                 <div class="col-lg-6">
-                  <div class="form-group">
+                  <div class="form-group" :class="[v$.maxZ.$error ? 'error' : '']">
                     <label for="">max_Z</label>
-                    <input type="text" v-model="model.second_step.maxZ" class="form-control">
+                    <input type="text" @keypress="isNumber" placeholder="max_Z"
+                      :class="[v$.maxZ.$error ? 'is-invalid' : '']" v-model="model.second_step.maxZ" class="form-control">
                   </div>
                 </div>
 
                 <div class="col-lg-6">
-                  <div class="form-group">
+                  <div class="form-group" :class="[v$.minZ.$error ? 'error' : '']">
                     <label for="">min_Z</label>
-                    <input type="text" v-model="model.second_step.minZ" class="form-control">
+                    <input type="text" @keypress="isNumber" placeholder="min_Z"
+                      :class="[v$.minZ.$error ? 'is-invalid' : '']" v-model="model.second_step.minZ" class="form-control">
                   </div>
                 </div>
 
               </div>
               <div class="card-footer mt-5">
-                <button type="button" class="btn btn-sm btn-info  text-white me-2" @click="current--">previous</button>
-                <button type="button" class="btn btn-sm btn-success float-right text-white">save</button>
+                <button type="button" class="btn btn-sm btn-info  text-white me-2"
+                  @click="store.current_step--">previous</button>
+                <button type="submit" class="btn btn-sm btn-success float-right text-white">save</button>
               </div>
             </div>
           </div>
