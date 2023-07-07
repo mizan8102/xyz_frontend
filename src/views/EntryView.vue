@@ -6,12 +6,12 @@ import FirstStep from '../components/steps/firstStep.vue';
 import { useAppStore } from '../store/app';
 import axiosClient from '../axios'
 import { isNumber, findMinMax,parseCSV,Model } from './Services';
-import { useNotification } from "@kyvg/vue3-notification";
 import Swal from "sweetalert2/dist/sweetalert2.js";
 import "sweetalert2/src/sweetalert2.scss";
+import { useRouter } from 'vue-router';
 const store = useAppStore()
 const isChartLoading = ref<boolean>(false)
-  const { notify }  = useNotification()
+const router = useRouter();
 
 store.current_step=1;
 const model = ref({
@@ -52,6 +52,7 @@ async function handlSave() {
       title: "XYZ Engine",
       text: "Added Successfull",
     });
+    router.push('/')
        loading.value = false
   }).catch((err) => {
     Swal.fire({
