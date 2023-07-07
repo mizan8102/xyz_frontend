@@ -1,19 +1,19 @@
 
 <script lang="ts" setup>
-import { useVuelidate } from '@vuelidate/core';
-import { required } from '@vuelidate/validators';
-import { computed, ref } from 'vue';
+import {  ref } from 'vue';
 import Chart from '../components/ChartComponent.vue';
 import FirstStep from '../components/steps/firstStep.vue';
 import { useAppStore } from '../store/app';
+import axiosClient from '../axios'
+import { isNumber, findMinMax,parseCSV,Model } from './Services';
+import { useNotification } from "@kyvg/vue3-notification";
+import Swal from "sweetalert2/dist/sweetalert2.js";
+import "sweetalert2/src/sweetalert2.scss";
 const store = useAppStore()
+const isChartLoading = ref<boolean>(false)
+  const { notify }  = useNotification()
 
-interface Model {
-  KP: number;
-  X: number;
-  Y: number;
-  Z: number;
-}
+store.current_step=1;
 const model = ref({
   first_step: {
     project_name: "",
@@ -22,120 +22,78 @@ const model = ref({
     contractor: ""
   },
   second_step: {
-    maxX: null,
-    minX: null,
-    maxY: null,
-    minY: null,
-    maxZ: null,
-    minZ: null,
+    max_X: null,
+    min_X: null,
+    max_Y: null,
+    min_Y: null,
+    max_Z: null,
+    min_Z: null,
   }
 
 })
 const chart_data = ref<Model[]>([])
-
-
-const rules = computed(() => {
-  return {
-    maxX: { required },
-    minX: { required },
-    maxY: { required },
-    minY: { required },
-    maxZ: { required },
-    minZ: { required }
-  }
+const  form = ref<boolean>(false);
+const  loading= ref<boolean>(false);
+const required =ref((v:any)=> {
+  return !!v || 'Field is required'
 })
-
-const v$ = useVuelidate(rules, model.value.second_step);
-
-
-
 async function handlSave() {
-  const result = await v$.value.$validate();
-  if (!result) {
-    return;
-  }
-  alert("ok")
+  if (!form.value) return
+  loading.value = true
+  axiosClient.post('/xyz_api',model.value)
+  .then((result) => {
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+      icon: "success",
+      title: "XYZ Engine",
+      text: "Added Successfull",
+    });
+       loading.value = false
+  }).catch((err) => {
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+      icon: "success",
+      title: "Error",
+      text: err.response.data.message,
+    });
+    loading.value = false
+  });
 }
 
 function handleFileChange(event: Event): void {
+  isChartLoading.value=true;
   const file = (event.target as HTMLInputElement).files?.[0];
   const reader = new FileReader();
-
   reader.onload = (e: ProgressEvent<FileReader>) => {
     const contents = e.target?.result as string;
     const data = parseCSV(contents);
     chart_data.value = data;
     model.value.second_step = findMinMax(data);
-    console.log(findMinMax(data)); // Process the data as needed
+    isChartLoading.value=false;
+    console.log(findMinMax(data));
   };
-
   reader.onerror = (error: ProgressEvent<FileReader>) => {
     console.error(error);
   };
-
   if (file) {
     reader.readAsText(file);
   }
+
 }
-
-function parseCSV(contents: string): Model[] {
-  const lines = contents.split('\n');
-  const headers = lines[0].split(',');
-
-  const data: Model[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',');
-    if (values.length === headers.length) {
-      const entry: Model = {
-        KP: parseInt(values[0], 10),
-        X: parseFloat(values[1]),
-        Y: parseFloat(values[2]),
-        Z: parseFloat(values[3]),
-      };
-      data.push(entry);
-    }
-  }
-  return data;
-}
-
-function findMinMax(data: Model[]): { maxX: number, minX: number, maxY: number, minY: number, maxZ: number, minZ: number } {
-  let maxX = -Infinity;
-  let minX = Infinity;
-  let maxY = -Infinity;
-  let minY = Infinity;
-  let maxZ = -Infinity;
-  let minZ = Infinity;
-
-  for (const entry of data) {
-    maxX = Math.max(maxX, entry.X);
-    minX = Math.min(minX, entry.X);
-    maxY = Math.max(maxY, entry.Y);
-    minY = Math.min(minY, entry.Y);
-    maxZ = Math.max(maxZ, entry.Z);
-    minZ = Math.min(minZ, entry.Z);
-  }
-
-  return { maxX, minX, maxY, minY, maxZ, minZ };
-}
-
-
-function isNumber(evt: any) {
-  evt = evt ? evt : window.event;
-  const charCode = evt.which ? evt.which : evt.keyCode;
-  if (
-    (charCode > 31 && (charCode < 48 || charCode > 57)) && // not a number
-    charCode !== 46 && // not a decimal point
-    charCode !== 45 // not a minus symbol
-  ) {
-    evt.preventDefault();
-  } else {
-    return true;
-  }
-}
-
 </script>
 <template>
-  <form class="p-4" @submit.prevent="handlSave">
+  <v-form class="p-4"
+        v-model="form"
+        @submit.prevent="handlSave"
+      >
     <div class="row">
       <div class="col-lg-12">
         <v-timeline direction="horizontal">
@@ -145,7 +103,7 @@ function isNumber(evt: any) {
     </div>
     <FirstStep v-if="store.current_step == 1" :first_step="model.first_step" v-model="model.first_step" />
     <div v-else>
-      <div class="card m-4">
+      <div class="card m-2">
         <div class="card-header bg-primary">
           <div class="card-title">
             <h5>Step-2 </h5>
@@ -183,93 +141,145 @@ function isNumber(evt: any) {
                   class="form-control">
               </div>
             </div>
-
-
           </div>
         </div>
       </div>
-
-      <div class="row m-3">
+      <div class="row me-1 ms-1 mt-3">
         <div class="col-lg-6">
           <div class="card">
             <div class="card-body">
               <div class="row">
                 <div class="col-lg-12">
                   <div class="form-group">
-                    <input type="file" accept=".csv,.xlsx" @change="handleFileChange" class="form-control" />
+                    <input type="file"  accept=".csv" @change="handleFileChange" class="form-control"  />
                   </div>
-
                 </div>
               </div>
-
               <div class="row mt-5">
                 <div class="col-lg-6">
-                  <div class="form-group" :class="[v$.maxX.$error ? 'error' : '']">
-                    <label for="">max_X</label>
-                    <input v-model="model.second_step.maxX" placeholder="max_X" @keypress="isNumber"
-                      :class="[v$.maxX.$error ? 'is-invalid' : '']" type="text" class="form-control">
+                  <div class="form-group" >
+                    <v-text-field
+                      v-model="model.second_step.max_X"
+                      :readonly="loading"
+                      :rules="[required]"
+                      density="compact"
+                      placeholder="Max_X"
+                      variant="outlined"
+                      small
+                      @keypress="isNumber"
+                      label="Max_X"
+                    ></v-text-field>
                   </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="form-group">
+                    <v-text-field
+                      v-model="model.second_step.min_X"
+                      :readonly="loading"
+                      :rules="[required]"
+                      density="compact"
+                      placeholder="Min_X"
+                      variant="outlined"
+                      small
+                      type="text"
+                      @keypress="isNumber"
+                      label="Min_X"
+                    ></v-text-field>
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="form-group" >
+                    <v-text-field
+                      v-model="model.second_step.max_Y"
+                      :readonly="loading"
+                      :rules="[required]"
+                      density="compact"
+                      placeholder="Max_Y"
+                      variant="outlined"
+                      small
+                      @keypress="isNumber"
+                      label="Max_Y"
+                    ></v-text-field></div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="form-group" >
+                    <v-text-field
+                      v-model="model.second_step.min_Y"
+                      :readonly="loading"
+                      :rules="[required]"
+                      density="compact"
+                      placeholder="Min_Y"
+                      variant="outlined"
+                      small
+                      @keypress="isNumber"
+                      label="Min_Y"
+                    ></v-text-field></div>
                 </div>
 
                 <div class="col-lg-6">
-                  <div class="form-group" :class="[v$.minX.$error ? 'error' : '']">
-                    <label for="">min_X</label>
-                    <input type="text" @keypress="isNumber" placeholder="min_X"
-                      :class="[v$.minX.$error ? 'is-invalid' : '']" v-model="model.second_step.minX" class="form-control">
-                  </div>
+                  <div class="form-group" >
+                    <v-text-field
+                      v-model="model.second_step.max_Z"
+                      :readonly="loading"
+                      :rules="[required]"
+                      density="compact"
+                      placeholder="Max_Z"
+                      variant="outlined"
+                      small
+                      @keypress="isNumber"
+                      label="Max_Z"
+                    ></v-text-field>
+                    </div>
                 </div>
 
                 <div class="col-lg-6">
-                  <div class="form-group" :class="[v$.maxY.$error ? 'error' : '']">
-                    <label for="">max_Y</label>
-                    <input type="text" @keypress="isNumber" placeholder="max_Y"
-                      :class="[v$.maxY.$error ? 'is-invalid' : '']" v-model="model.second_step.maxY" class="form-control">
-                  </div>
-                </div>
-
-                <div class="col-lg-6">
-                  <div class="form-group" :class="[v$.minY.$error ? 'error' : '']">
-                    <label for="">min_Y</label>
-                    <input type="text" @keypress="isNumber" placeholder="min_Y"
-                      :class="[v$.minY.$error ? 'is-invalid' : '']" v-model="model.second_step.minY" class="form-control">
-                  </div>
-                </div>
-
-                <div class="col-lg-6">
-                  <div class="form-group" :class="[v$.maxZ.$error ? 'error' : '']">
-                    <label for="">max_Z</label>
-                    <input type="text" @keypress="isNumber" placeholder="max_Z"
-                      :class="[v$.maxZ.$error ? 'is-invalid' : '']" v-model="model.second_step.maxZ" class="form-control">
-                  </div>
-                </div>
-
-                <div class="col-lg-6">
-                  <div class="form-group" :class="[v$.minZ.$error ? 'error' : '']">
-                    <label for="">min_Z</label>
-                    <input type="text" @keypress="isNumber" placeholder="min_Z"
-                      :class="[v$.minZ.$error ? 'is-invalid' : '']" v-model="model.second_step.minZ" class="form-control">
-                  </div>
+                  <div class="form-group">
+                    <v-text-field
+                      v-model="model.second_step.min_Z"
+                      :readonly="loading"
+                      :rules="[required]"
+                      density="compact"
+                      placeholder="Min_Z"
+                      variant="outlined"
+                      @keypress="isNumber"
+                      label="Min_Z"
+                    ></v-text-field></div>
                 </div>
 
               </div>
               <div class="card-footer mt-5">
-                <button type="button" class="btn btn-sm btn-info  text-white me-2"
-                  @click="store.current_step--">previous</button>
-                <button type="submit" class="btn btn-sm btn-success float-right text-white">save</button>
+                <v-row align="center" justify="center">
+                  <v-col cols="auto">
+                    <v-btn
+                      :disabled="!form"
+                      :loading="loading"
+                      block
+                      color="success"
+                      size="small"
+                      type="submit"
+                      variant="elevated"
+                    >
+                      Save
+                    </v-btn>
+                    </v-col>
+                  </v-row>
               </div>
             </div>
           </div>
         </div>
         <div class="col-lg-6">
-          <div class="card">
+          <div v-if="isChartLoading" class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+          <div class="card" v-if="chart_data.length">
             <div class="card-body">
-              <Chart v-if="chart_data.length" :data="chart_data" />
+              <Chart  :data="chart_data" />
             </div>
           </div>
         </div>
+        <button type="button" class="btn btn-sm prev-btn btn-info mw-50 text-white mt-5 me-2" style="max-width:70px"
+                  @click="store.current_step--">previous</button>
       </div>
-
     </div>
-
-  </form>
+  </v-form>
 </template>

@@ -1,22 +1,47 @@
 <template>
   <v-app-bar color="primary" prominent>
-    <v-app-bar-nav-icon variant="text" @click.stop="rail = !rail"></v-app-bar-nav-icon>
 
-    <v-toolbar-title>XYZ Engine</v-toolbar-title>
+    <v-toolbar-title class="ms-5"> XYZ ENGINE</v-toolbar-title>
 
     <v-spacer></v-spacer>
-  </v-app-bar>
-  <v-navigation-drawer :rail="rail" permanent @click="rail = false">
 
-    <v-list density="compact" nav>
-      <v-list-item to="/" prepend-icon="mdi-home-city" title="Result" value="home"></v-list-item>
-      <v-list-item to="/entry" prepend-icon="mdi-account" title="Entry" value="account"></v-list-item>
-  
-    </v-list>
-  </v-navigation-drawer>
+    <v-row justify="center" align="center">
+      <v-col cols="auto" v-for="(link,i) in links" :key="i">
+        <RouterLink :to="link.url" class="link " >{{ link.title }}</RouterLink>
+      </v-col>
+    </v-row>
+
+  </v-app-bar>
+
 </template>
 
 <script lang="ts" setup>
 import { ref } from 'vue';
-const rail = ref<boolean>(false);
+const links =ref ([
+  {
+    title: 'Result',
+    url:'/',
+  },
+  {
+    title: 'Add',
+    url:'/entry',
+  }
+])
 </script>
+
+<style scoped>
+.link{
+  color:white !important;
+  text-decoration: none;
+}
+.active {
+  background: white;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  color: black !important;
+  border-radius: 0.75rem;
+}
+</style>
+
