@@ -55,10 +55,7 @@ async function handlSave() {
     router.push('/')
        loading.value = false
   }).catch((err) => {
-    let message=err.message;
-    if(!message){
-      message = "server error"
-    }
+    
     Swal.fire({
       toast: true,
       position: "top-end",
@@ -67,7 +64,7 @@ async function handlSave() {
       timerProgressBar: true,
       icon: "error",
       title: "Error",
-      text: message,
+      text: "Server error",
     });
     loading.value = false
   });
